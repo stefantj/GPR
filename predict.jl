@@ -89,10 +89,19 @@ function sample_n(gp::GaussianProcessEstimate,
         end
 
     end
+        # Covariance matrix is always symmetric
+        cov_mat = Hermitian(cov_mat);
 
     # Is this correct? should be
         f = mean + sqrtm(cov_mat)*randn(n_X,1);
         # TODO: Verify that this is actually correct...
+
+        if(norm(real(f)) < norm(abs(f)))
+            warn("Negative covariance matrix gave imaginary prediction $f");
+            warn("mean = $mean");
+            warn("Cov = $cov_mat")
+        end
+
         return real(f)
 end
 
@@ -170,6 +179,7 @@ function update(gp::GaussianProcessEstimate,
             gp.Q_matrix[repeat,:] += gp.Q_matrix[numcenters,:]
             gp.Q_matrix = gp.Q_matrix[1:numcenters-1,1:numcenters-1]
 
+            gp.Q_matrix = Hermitian(gp.Q_matrix)
             # Update centers
             gp.centers=gp.centers[:,1:numcenters-1]
             gp.numcenters -= 1
