@@ -45,40 +45,6 @@ end
 
 # Sample n points from posterior distribution
 function sample_n(gp::GaussianProcessEstimate,
-<<<<<<< HEAD
-                       X::Matrix{Float64})
-    n_X = size(X,2); # Number of entries. If scalars, X must be a row vector.
-    K_x = zeros(n_X, n_X)
-    H_x = [];
-    if(gp.numcenters == 0) # uninitialized GP, sample from prior.
-        H_x = zeros(n_X, 1);
-    else
-        H_x = zeros(n_X, gp.numcenters);
-    end
-
-    for i=1:n_X
-        for j = 1:gp.numcenters
-            H_x[i, j] = covar(gp.prior.kernel, X[:,i], gp.centers[:,j])
-        end
-        for j = i:n_X
-            K_x[i,j] = covar(gp.prior.kernel, X[:,i], X[:,j])
-        end
-    end
-
-    if(gp.numcenters == 0)
-        # Mean 
-        μ = H_x;
-        # Covariance:
-        Σ = K_x;
-    else
-        # Mean:
-        μ = H_x*gp.weights
-        # Covariance:
-        Σ = K_x - H_x*(gp.Q_matrix*(H_x'));
-    end
-
-    return μ + sqrtm(Σ)*randn(n_X,1);    
-=======
                   X::Vector{Vector{Float64}})
     X_mat = zeros(length(X),2)
     indx = 0;
@@ -126,8 +92,8 @@ function sample_n(gp::GaussianProcessEstimate,
 
     # Is this correct? should be
         f = mean + sqrtm(cov_mat)*randn(n_X,1);
+        # TODO: Verify that this is actually correct...
         return real(f)
->>>>>>> 00dfc7eb4466dd99daf5d1c9e51f1ef82efb7243
 end
 
 
@@ -173,11 +139,7 @@ function update(gp::GaussianProcessEstimate,
 
         # r_i = 1/r
         r_i = 1./(gp.prior.noise + kernel_norm - z'*h)
-<<<<<<< HEAD
 	    r_i = r_i[1] #Convert back to scalar
-=======
-	r_i = r_i[1] #Convert back to scalar
->>>>>>> 00dfc7eb4466dd99daf5d1c9e51f1ef82efb7243
 
         # Rank-1 update of Q_i:
         #  Q_i = [ Q_{i-1}+zz'/r  -z/r
@@ -194,13 +156,8 @@ function update(gp::GaussianProcessEstimate,
                        -z'*r_i     r_i]
 
         # Update weights
-<<<<<<< HEAD
 	    gp.weights -= vec(z.*(error*r_i))
 	    gp.weights = [gp.weights; vec(error*r_i)]
-=======
-	gp.weights -= vec(z.*(error*r_i))
-	gp.weights = [gp.weights; vec(error*r_i)]
->>>>>>> 00dfc7eb4466dd99daf5d1c9e51f1ef82efb7243
 
         # If there was a repeat, collapse Q, a to their equivalent n-1 size
         if(false && repeat > 0)
