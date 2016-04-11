@@ -43,6 +43,68 @@ function predict(gp::GaussianProcessEstimate,
     end
 end
 
+
+# Predict at point x
+function predict_var(gp::GaussianProcessEstimate,
+                 x::Vector{Float64})
+
+    if(gp.numcenters==0)
+        return 0.
+    else
+        x = float(x)
+        h = zeros(gp.numcenters,1)
+        for i=1:gp.numcenters
+            h[i] = covar(gp.prior.kernel, x, gp.centers[:,i])
+        end
+        z = gp.Q_matrix*h
+        var = gp.prior.noise + covar(gp.prior.kernel, x, x) - z'*h
+        if(var[1] < 0)
+            println("Error: Negative variance!")
+        end
+        return (var[1])
+    end
+end
+
+# Predict at vector of points x
+function predict_mean(gp::GaussianProcessEstimate,
+                 x::Array{Float64,2})
+
+    # Assume that it's stored with points as columns
+    if(gp.numcenters==0)
+        return zeros(size(x,2))
+    else
+        num_points = size(x, 2);
+        
+        x = float(x)
+        H = zeros(gp.numcenters,num_points)
+        for k = 1:num_points
+            for i=1:gp.numcenters
+                H[i,k] = covar(gp.prior.kernel, x[:,k], gp.centers[:,i])
+            end
+        end
+        mean = H'*gp.weights
+        return mean
+    end
+end
+
+# Predict at point x
+function predict_mean(gp::GaussianProcessEstimate,
+                 x::Vector{Float64})
+    if(gp.numcenters==0)
+        return 0.
+    else
+        x = float(x)
+        h = zeros(gp.numcenters,1)
+        for i=1:gp.numcenters
+            h[i] = covar(gp.prior.kernel, x, gp.centers[:,i])
+        end
+        mean = h'*gp.weights
+        return mean[1]
+    end
+end
+
+
+
 # Sample n points from posterior distribution
 function sample_n(gp::GaussianProcessEstimate,
                   X::Vector{Vector{Float64}})
@@ -94,9 +156,8 @@ function sample_n(gp::GaussianProcessEstimate,
 
     # Is this correct? should be
         f = mean + sqrtm(cov_mat)*randn(n_X,1);
-        # TODO: Verify that this is actually correct...
 
-        if(norm(real(f)) < norm(abs(f)))
+        if(norm(real(f)) < norm(abs(f)) - 0.01)
             warn("Negative covariance matrix gave imaginary prediction $f");
             warn("mean = $mean");
             warn("Cov = $cov_mat")
