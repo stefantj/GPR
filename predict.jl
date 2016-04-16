@@ -2,6 +2,7 @@
 #
 # Predicts the value of the Gaussian process using Gaussian process regression.
 
+# Fix this to be just the 
 
 # Prior
 type GaussianProcess
@@ -151,11 +152,11 @@ function sample_n(gp::GaussianProcessEstimate,
         end
 
     end
-        # Covariance matrix is always symmetric
-        cov_mat = Hermitian(cov_mat);
 
-    # Is this correct? should be
-        f = mean + sqrtm(cov_mat)*randn(n_X,1);
+#    println(cov_mat+ 1e-3*eye(n_X))
+
+        f = mean + chol(cov_mat)*randn(n_X,1);
+
 
         if(norm(real(f)) < norm(abs(f)) - 0.01)
             warn("Negative covariance matrix gave imaginary prediction $f");
@@ -221,8 +222,10 @@ function update(gp::GaussianProcessEstimate,
         
         # Room for improvement here
         # The stronger you type the data, the faster you'll go.
+        # Symmetric rank 1 update: Q_{i-1} += zz'/r
         gp.Q_matrix += z*z'*r_i
-        gp.Q_matrix = [gp.Q_matrix -z*r_i;
+        # Concatenate
+        gp.Q_matrix =[gp.Q_matrix -z*r_i;
                        -z'*r_i     r_i]
 
         # Update weights
@@ -230,7 +233,7 @@ function update(gp::GaussianProcessEstimate,
 	    gp.weights = [gp.weights; vec(error*r_i)]
 
         # If there was a repeat, collapse Q, a to their equivalent n-1 size
-        if(false && repeat > 0)
+        if(true && repeat > 0)
             # Update weights
             gp.weights[repeat] += gp.weights[numcenters];
             splice!(gp.weights, numcenters);
@@ -240,7 +243,6 @@ function update(gp::GaussianProcessEstimate,
             gp.Q_matrix[repeat,:] += gp.Q_matrix[numcenters,:]
             gp.Q_matrix = gp.Q_matrix[1:numcenters-1,1:numcenters-1]
 
-            gp.Q_matrix = Hermitian(gp.Q_matrix)
             # Update centers
             gp.centers=gp.centers[:,1:numcenters-1]
             gp.numcenters -= 1

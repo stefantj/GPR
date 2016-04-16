@@ -36,8 +36,8 @@ end
 
 # Fills a covariance matrix between collections of objects
 function covarMatrix(kernel::CovarianceKernel,
-                      v1::Vector,
-                      v2::Vector)			
+                      v1,
+                      v2)			
     n1 = size(v1,1)
     n2 = size(v2,1)
     cv = zeros(n1,n2)
@@ -64,13 +64,3 @@ function covarComb(kernel::CovarianceKernel,
         println("Can't compare objects of different size");
     end
 end
-
-
-
-
-
-
-
-
-
-
