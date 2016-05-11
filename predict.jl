@@ -27,7 +27,7 @@ function predict(gp::GaussianProcessEstimate,
                  x)
 
     if(gp.numcenters==0)
-        return 0.,NaN;
+        return 0.,covar(gp.prior.kernel, 0,0)
     else
         x = float(x)
         h = zeros(gp.numcenters,1)
