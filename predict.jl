@@ -27,7 +27,7 @@ function predict(gp::GaussianProcessEstimate,
                  x)
 
     if(gp.numcenters==0)
-        return 0.,covar(gp.prior.kernel, 0,0)
+        return 0.,covar(gp.prior.kernel, x,x)
     else
         x = float(x)
         h = zeros(gp.numcenters,1)
@@ -44,6 +44,29 @@ function predict(gp::GaussianProcessEstimate,
     end
 end
 
+# Forms upper confidence bound at specified points
+function form_ucb(gp::GaussianProcessEstimate, x::Array{Float64,2}, beta::Float64)
+    num_points = size(x,2)
+    if(gp.numcenters==0)
+        return sqrt(beta)*ones(num_points)
+    else
+        x = float(x)
+        ucb = zeros(num_points)
+        srb = sqrt(beta)
+        sigma_0 = gp.prior.noise + 1 # Assuming that kernel is normalized. Otherwise replace 1 with covar(gp.prior.kernel, x[:,k],x[:,k])
+        # This is devectorized for speed. The computation is z = h'Qh where h is the kernel vector
+        for k = 1:num_points
+            h_k = zeros(gp.numcenters)
+            for i=1:gp.numcenters
+                h_k[i] = covar(gp.prior.kernel, x[:,k],gp.centers[:,i])
+            end
+            var_k = ((h_k'*gp.Q_matrix)*h_k)[1]
+            mean_k = (h_k'*gp.weights)[1]
+            ucb[k] = mean_k  + srb*sqrt(sigma_0 - var_k)
+        end
+        return ucb
+    end
+end
 
 # Predict at point x
 function predict_var(gp::GaussianProcessEstimate,
