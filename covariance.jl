@@ -25,6 +25,7 @@ function covar(kernel::SquaredExponential,
 end
 
 # Evaluates covariance elementwise on an array.
+# No idea what this is supposed to do, appears to be incorrect.
 function covar(kernel::SquaredExponential, X::Matrix{Float64})
     sigma = similar(X)
     iter = 0
