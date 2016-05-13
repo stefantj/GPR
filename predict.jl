@@ -27,15 +27,16 @@ function predict(gp::GaussianProcessEstimate,
                  x)
 
     if(gp.numcenters==0)
-        return 0.,covar(gp.prior.kernel, x,x)
+        return 0.,gp.prior.kernel.variance
     else
         x = float(x)
         h = zeros(gp.numcenters,1)
         for i=1:gp.numcenters
             h[i] = covar(gp.prior.kernel, x, gp.centers[:,i])
         end
-        z = gp.Q_matrix*h
-        var = gp.prior.noise + covar(gp.prior.kernel, x, x) - z'*h
+        # Compute as row multiplication for speed
+        z = (h'*gp.Q_matrix)'
+        var = gp.prior.noise + gp.prior.kernel.variance - z'*h
         mean = h'*gp.weights
         if(var[1] < 0)
             println("Error: Negative variance!")
@@ -53,7 +54,7 @@ function form_ucb(gp::GaussianProcessEstimate, x::Array{Float64,2}, beta::Float6
         x = float(x)
         ucb = zeros(num_points)
         srb = sqrt(beta)
-        sigma_0 = gp.prior.noise + 1 # Assuming that kernel is normalized. Otherwise replace 1 with covar(gp.prior.kernel, x[:,k],x[:,k])
+        sigma_0 = gp.prior.noise + gp.prior.kernel.variance
         # This is devectorized for speed. The computation is z = h'Qh where h is the kernel vector
         for k = 1:num_points
             h_k = zeros(gp.numcenters)
@@ -73,15 +74,16 @@ function predict_var(gp::GaussianProcessEstimate,
                  x::Vector{Float64})
 
     if(gp.numcenters==0)
-        return 0.
+        return covar(gp.prior.kernel, x, x)
     else
         x = float(x)
         h = zeros(gp.numcenters,1)
         for i=1:gp.numcenters
             h[i] = covar(gp.prior.kernel, x, gp.centers[:,i])
         end
-        z = gp.Q_matrix*h
-        var = gp.prior.noise + covar(gp.prior.kernel, x, x) - z'*h
+        # compute as row multiplication for speed:
+        z = (h'*gp.Q_matrix)'
+        var = gp.prior.noise + gp.prior.kernel.variance - z'*h
         if(var[1] < 0)
             println("Error: Negative variance!")
         end
@@ -132,16 +134,17 @@ end
 # Sample n points from posterior distribution
 function sample_n(gp::GaussianProcessEstimate,
                   X::Vector{Vector{Float64}})
-    X_mat = zeros(length(X),2)
+    X_mat = zeros(2,length(X))
     indx = 0;
     for x in X
       indx+=1;
-      X_mat[indx, 1] = x[1]
-      X_mat[indx, 2] = x[2]
+      X_mat[1,indx] = x[1]
+      X_mat[2,indx] = x[2]
     end
-    return sample_n(gp, X_mat')
+    return sample_n(gp, X_mat)
 end
 
+# TODO: This accesses memory in a slow manner. 
 function sample_n(gp::GaussianProcessEstimate,
                        X::Matrix{Float64})
     n_X = size(X,2); # Number of entries. If scalars, X must be a row vector.
@@ -152,10 +155,14 @@ function sample_n(gp::GaussianProcessEstimate,
         H_x = zeros(n_X, gp.numcenters);
         K_x = zeros(n_X, n_X)
 
-        for i=1:n_X
-            for j = 1:gp.numcenters
-                H_x[i, j] = covar(gp.prior.kernel, X[:,i], gp.centers[:,j])
+        for j = 1:gp.numcenters
+            for i = 1:n_X
+                H_x[i,j] = covar(gp.prior.kernel, X[:,i], gp.centers[:,j])
             end
+        end
+       
+        # TODO: Is this right? seems to work, but I only fill in half of the entries... Cholesky magic?
+        for i=1:n_X
             for j = i:n_X
                 K_x[i,j] = covar(gp.prior.kernel, X[:,i], X[:,j])
             end
@@ -202,12 +209,11 @@ function update(gp::GaussianProcessEstimate,
     numcenters = gp.numcenters
     error = 0.0
     # In case the kernel isn't normalized
-    kernel_norm = covar(gp.prior.kernel,x,x);
     x = float(x)
 
     # Initialize if needed
     if(numcenters == 0)
-        gp.Q_matrix[1,1] = 1.0/(gp.prior.noise + kernel_norm)
+        gp.Q_matrix[1,1] = 1.0/(gp.prior.noise + gp.prior.kernel.variance)
         gp.weights[1] = gp.Q_matrix[1,1]*y
         gp.centers[:,1] = x
         gp.numcenters += 1
@@ -225,14 +231,14 @@ function update(gp::GaussianProcessEstimate,
 
         # Compute error
         error = y - gp.weights'*h
-        z = gp.Q_matrix*h
+        z = (h'*gp.Q_matrix)'
         
         gp.centers = [gp.centers x]
         gp.numcenters += 1
         numcenters += 1
 
         # r_i = 1/r
-        r_i = 1./(gp.prior.noise + kernel_norm - z'*h)
+        r_i = 1./(gp.prior.noise + gp.prior.kernel.variance - z'*h)
 	    r_i = r_i[1] #Convert back to scalar
 
         # Rank-1 update of Q_i:
@@ -256,7 +262,7 @@ function update(gp::GaussianProcessEstimate,
 	    gp.weights = [gp.weights; vec(error*r_i)]
 
         # If there was a repeat, collapse Q, a to their equivalent n-1 size
-        if(true && repeat > 0)
+        if(repeat > 0)
             # Update weights
             gp.weights[repeat] += gp.weights[numcenters];
             splice!(gp.weights, numcenters);

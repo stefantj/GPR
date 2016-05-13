@@ -13,6 +13,7 @@ abstract CovarianceKernel
 # Add: Matern, some more from Srinivas
 type SquaredExponential <: CovarianceKernel
     bandwidth::Float64
+    variance::Float64
 end
 
 # Squared Exponential,
@@ -21,7 +22,7 @@ function covar(kernel::SquaredExponential,
                 x1,
                 x2)
     r=norm(float(x1)-float(x2));
-    return exp(-r^2/(2*(kernel.bandwidth^2)))
+    return kernel.variance*exp(-r^2/(2*(kernel.bandwidth^2)))
 end
 
 # Evaluates covariance elementwise on an array.
@@ -29,7 +30,7 @@ end
 function covar(kernel::SquaredExponential, X::Matrix{Float64})
     sigma = similar(X)
     iter = 0
-    [ sigma[iter+=1] = exp(-x^2/(2*(kernel.bandwidth^2))) for x in X]
+    [ sigma[iter+=1] = kernel.variance*exp(-x^2/(2*(kernel.bandwidth^2))) for x in X]
     return sigma
 end
 
